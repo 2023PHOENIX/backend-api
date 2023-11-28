@@ -11,9 +11,9 @@ function registerNewUser(req, res) {
         const newUser = new User({firstname, lastname, email, password: hashedPassword});
 
         newUser.save().then(() => {
-            res.status(200).send({message: "saved successfully"})
+            return res.status(200).send({message: "saved successfully"})
         }).catch(e => {
-            res.status(401).send({message: e.message});
+            return res.status(401).send({message: e.message});
         });
     })
 }
@@ -25,15 +25,15 @@ async function loginUser(req, res) {
     const user = await User.findOne({email});
 
     if (!user) {
-        res.status(401).json({message: "user not found"});
+        return res.status(401).json({message: "user not found"});
     }
 
     const passwordMatch = await bcrypt.compare(password, user.password);
     if (passwordMatch) {
         const token = await jwt.sign({email}, process.env.privateKey, {expiresIn: '1h'});
-        res.status(200).json({message: "successfully logged in", "jwt-token": token});
+        return res.status(200).json({message: "successfully logged in", "jwttoken": token});
     } else {
-        res.status(401).send({message: "password was incorrect"});
+        return res.status(401).send({message: "password was incorrect"});
     }
 }
 
