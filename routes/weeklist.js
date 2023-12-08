@@ -4,6 +4,9 @@ const {
   updateWeekList,
   deleteWeekList,
   deleteWeekListTask,
+  fetchAllWeekList,
+  fetchWeekListByID,
+  fetchActiveWeekList,
 } = require("../controller/weeklist.js");
 const bodyParser = require("body-parser");
 const {
@@ -31,4 +34,8 @@ router.delete(
   authenticateUser,
   deleteWeekListTask,
 );
+
+router.get("/fetch-weeklist", authenticateUser, fetchAllWeekList);
+router.get("/fetch-weeklist-by-id/:id", authenticateUser, fetchWeekListByID);
+router.get("/feed", authenticateUser, fetchActiveWeekList);
 module.exports = router;
