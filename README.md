@@ -29,3 +29,8 @@ FETCH FEED (all active checklist) : <code>/weeklist/feed </code>
 ## HEALTH 
 
 health : <code>/health </code>
+
+
+#DEPLOYMENT
+
+> https://weeklist-todo.onrender.com
