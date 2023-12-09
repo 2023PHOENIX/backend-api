@@ -1,4 +1,3 @@
-const color = require("colors");
 const express = require("express");
 const dotenv = require("dotenv");
 const { ConnectionToDB } = require("./connection");
