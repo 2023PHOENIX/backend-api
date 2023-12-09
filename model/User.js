@@ -66,18 +66,25 @@ const UserSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-  weekList: [{
-    list : [weekListSchema],
-    createdAt: {
-      type: Date,
-      default: Date.now,
-      immutable: true,
-    }
-  }],
+  weekList: [
+    {
+      list: [weekListSchema],
+      createdAt: {
+        type: Date,
+        default: Date.now,
+        immutable: true,
+      },
+      status: {
+        type: String,
+        enum: ["active", "inactive", "completed"],
+      },
+    },
+  ],
 });
 
 const User = new mongoose.model("user", UserSchema);
 const weeklist = new mongoose.model("weekList", weekListSchema);
 module.exports = {
-  User,weeklist
-  };
+  User,
+  weeklist,
+};

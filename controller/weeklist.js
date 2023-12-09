@@ -1,4 +1,4 @@
-const {User, weeklist} = require("../model/User.js");
+const { User, weeklist } = require("../model/User.js");
 
 const createWeekList = async (req, res) => {
   // TODO: working for the creating new weeklist
@@ -10,8 +10,7 @@ const createWeekList = async (req, res) => {
     //  ? i have two choices weather to create new weeklist or append in previous weeklist
 
     if (isNewWeekList === true && user.weekList.length <= 1) {
-
-      user.weekList.push({ list: [todo] });
+      user.weekList.push({ list: [todo], status: "active" });
     } else if (index >= 0 && isNewWeekList === false) {
       user.weekList[index].list.push(todo);
     } else if (user.weekList.length == 2) {
@@ -29,8 +28,12 @@ const createWeekList = async (req, res) => {
     message: "ok",
   });
 };
-
-// ! BUG: check for the time to 24hr is completed or not 
+const checkTime = (createdTime) => {
+  const timeDiff = (Date.now() - createdTime) / (1000 * 60 * 60);
+  if (timeDiff > 24) return false;
+  return true;
+};
+// ! BUG: check for the time to 24hr is completed or not
 const updateWeekList = async (req, res) => {
   //NOTE: check for update is possible or not.
   const query = req.body;
@@ -39,17 +42,18 @@ const updateWeekList = async (req, res) => {
   try {
     const user = await User.findOne({ _id: uniqueId });
 
-    const checkListData = user.weekList[weekListArrayIndex]?.list[weekListObjectIndex]
+    const checkListData =
+      user.weekList[weekListArrayIndex]?.list[weekListObjectIndex];
     if (checkListData) {
-      const timeDifference =
-        (Date.now() - checkListData.createdAt) / (1000 * 60 * 60);
-      if (timeDifference > 24) {
-        return res.status(401).send({
-          message:
-            "can't update the checkList from weeklist because it already have passed 24hrs",
-        });
+      const isAvailable = checkTime(checkListData.createdAt);
+      if (isAvailable === false) {
+        user.weekList[weekListArrayIndex].status = "inactive";
+        return res
+          .status(401)
+          .send({ message: "you can't update the checklist 24hr passed" });
       } else {
         checkListData.updatedAt = Date.now();
+
         // ? I can change title and checked.
         // * if user sends title to update we will update the title
         // * if user sends checked to update we will update the checked value
@@ -61,36 +65,51 @@ const updateWeekList = async (req, res) => {
             checkListData.completedAt = Date.now();
           }
         }
+
+        const activeCheckedItem = user.weekList[weekListArrayIndex].list.filter(
+          (l) => l.checked === false,
+        );
+        console.log("-------------------------------------------");
+        console.log(activeCheckedItem.length);
+        console.log("-------------------------------------------");
+        if (activeCheckedItem.length == 0) {
+          user.weekList[weekListArrayIndex].status = "completed";
+        }
         await user.save();
 
-        console.log(checkListData);
+        // console.log(checkListData);
         return res.send({ message: "checklist has been updated" });
       }
     }
-  }
-  catch (e) {
+  } catch (e) {
     console.log(e.message);
     return res.status(500).send({ message: "internal server error" });
   }
 
-  res.send({ message: "ok" });
+  // res.send({ message: "ok" });
 };
-// ! BUG: check for the time to 24hr is completed or not 
+// ! BUG: check for the time to 24hr is completed or not
 // ? deleting the weeklist from the DB
 const deleteWeekList = async (req, res) => {
   const email = req.email;
   const { weekListArrayIndex } = req.params;
-  
+
   try {
     const user = await User.findOne({ email });
-    
+
     if (!user) {
       return res.status(404).send({ message: "User not found" });
     }
-    
+    console.log(weekListArrayIndex);
+    if (!checkTime(user.weekList[weekListArrayIndex].createdAt)) {
+      user.weeklist[weekListArrayIndex].status = "inactive";
+      return res
+        .status(401)
+        .send({ message: "can't delete the weeklist because it passed 24hrs" });
+    }
     user.weekList.splice(weekListArrayIndex, 1);
     await user.save();
-    
+
     return res.status(200).send({ message: "Week list deleted successfully" });
   } catch (error) {
     console.error(error);
@@ -98,14 +117,15 @@ const deleteWeekList = async (req, res) => {
   }
 };
 
-// ! BUG: check for the time to 24hr is completed or not 
+// ! BUG: check for the time to 24hr is completed or not
+// WARNING:  not sure about the deleting checklist work after 24hrs or not.
 const deleteWeekListTask = async (req, res) => {
   const email = req.email;
   const { weekListArrayIndex, weekListTaskIndex } = req.params;
-  
+
   try {
     const user = await User.findOne({ email });
-    
+
     if (!user) {
       return res.status(404).send({ message: "User not found" });
     }
@@ -116,7 +136,9 @@ const deleteWeekListTask = async (req, res) => {
       weekList.list.splice(weekListTaskIndex, 1);
       await user.save();
 
-      return res.status(200).send({ message: "Week list task deleted successfully" });
+      return res
+        .status(200)
+        .send({ message: "Week list task deleted successfully" });
     } else {
       return res.status(404).send({ message: "Week list not found" });
     }
@@ -126,19 +148,15 @@ const deleteWeekListTask = async (req, res) => {
   }
 };
 
-
-
-
 // * return all the weeklist with time left.
 
-const fetchAllWeekList = async(req, res) => {
-  
+const fetchAllWeekList = async (req, res) => {
   const email = req.email;
 
   const user = await User.findOne({ email });
 
   const weekListArray = user.weekList;
-  
+
   const resultArray = [];
   for (weeklist of weekListArray) {
     const current = Date.now();
@@ -151,29 +169,26 @@ const fetchAllWeekList = async(req, res) => {
       const seconds = Math.floor(timeDiff % 60);
 
       resultArray.push({
-        data : weeklist.list,
+        data: weeklist.list,
         timeLeft: {
           hours,
           minutes,
           seconds,
-        }
+        },
       });
     } else {
       console.log("More than 24 hours have passed since creation.");
       resultArray.push({
         weeklist,
-        message : "More than 24 hours have passed since creation",
-      })
+        message: "More than 24 hours have passed since creation",
+      });
     }
-
   }
   return res.status(200).send({
     message: "Success",
-    resultArray
+    resultArray,
   });
-
-}
-
+};
 
 // ^ fetch specific weeklist by ID.
 const fetchWeekListByID = async (req, res) => {
@@ -184,51 +199,43 @@ const fetchWeekListByID = async (req, res) => {
   try {
     // Assuming WeekList is your Mongoose model
     const user = await User.findOne({ email: req.email });
-    
-    const result = user.weekList.find(w => w._id.equals(id));
-    
+
+    const result = user.weekList.find((w) => w._id.equals(id));
+
     if (result) {
-      res.status(200).send({ message : "ok",data : result });
+      res.status(200).send({ message: "ok", data: result });
     }
   } catch (e) {
     console.log(e);
     res.status(500).send({ message: "internal server error" });
   }
-    
-}
+};
 
-
-const fetchActiveWeekList = async(req, res) => {
-  
+const fetchActiveWeekList = async (req, res) => {
   const users = await User.find({});
-  
-     const activeCheckedItems = [];
 
-    users.forEach(user => {
-      user.weekList.forEach(weekList => {
-        weekList.list.forEach(item => {
-          if (item.checked) {
-            // Include additional fields if needed
-            const activeCheckedItem = {
-              userId: user._id,
-              weekListId: weekList._id,
-              itemId: item._id,
-              desc: item.desc,
-              // Include other fields as needed
-            };
-            activeCheckedItems.push(activeCheckedItem);
-          }
-        });
+  const activeCheckedItems = [];
+
+  users.forEach((user) => {
+    user.weekList.forEach((weekList) => {
+      weekList.list.forEach((item) => {
+        if (item.checked) {
+          // Include additional fields if needed
+          const activeCheckedItem = {
+            userId: user._id,
+            weekListId: weekList._id,
+            itemId: item._id,
+            desc: item.desc,
+            // Include other fields as needed
+          };
+          activeCheckedItems.push(activeCheckedItem);
+        }
       });
     });
-  
-  
-  
+  });
 
-  res.send({ message: "ok" ,data : activeCheckedItems});
-}
-
-
+  res.send({ message: "ok", data: activeCheckedItems });
+};
 
 module.exports = {
   createWeekList,
@@ -237,7 +244,7 @@ module.exports = {
   deleteWeekListTask,
   fetchAllWeekList,
   fetchWeekListByID,
-  fetchActiveWeekList
+  fetchActiveWeekList,
 };
 
 /* HACK:  create an schema weeklist {
